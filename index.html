@@ -132,6 +132,7 @@
         <div class="input">
           <input type="text" id="nonce" placeholder="leave blank to generate">
         </div>
+        <div class="errorsdiv"><p id="errors"></p></div>
         <div class="description">Message</div>
         <div class="input">
           <textarea id="plaintext" placeholder="Input"></textarea>
@@ -380,39 +381,81 @@
           return buf;
         }
 
-        (async () => {
-          await sodium.ready;
+        const passphrasebox = document.querySelector("input[id='passphrase']");
+        const noncebox = document.querySelector("input[id='nonce']");
+        const nonceoutbox = document.querySelector("input[id='nonceout']");
+        const plaintext = document.querySelector("textarea[id='plaintext']");
+        const ciphertext = document.querySelector("textarea[id='ciphertext']");
+        const macbox = document.querySelector("input[id='mac']");
+        const errorsdiv = document.querySelector("p[id='errors']");
 
-          var key = sodium.randombytes_buf(sodium.crypto_secretbox_KEYBYTES);
-          var nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+        var key = null;
+        var salt = null;
+        var nonce = null;
 
-          const passphrasebox = document.querySelector("input[id='passphrase']");
-          const noncebox = document.querySelector("input[id='nonce']");
-          const nonceoutbox = document.querySelector("input[id='nonceout']");
-          const plaintext = document.querySelector("textarea[id='plaintext']");
-          const ciphertext = document.querySelector("textarea[id='ciphertext']");
-          const macbox = document.querySelector("input[id='mac']");
+        // function filtercharset()
 
+        // function modulo8pad()
+
+        sodium.ready
+        .then(() => {
+          passphrasebox.addEventListener('focusout', passHandler);
+          noncebox.addEventListener('input', nonceHandler);
           plaintext.addEventListener('input', inputHandler);
 
-          // function filtercharset()
-
-          // function modulo8pad()
-
-          function inputHandler(e) {
-            passphrase.value = base32.encode(uint8_tostr(key));
+          async function genNonce() {
+            nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+            salt = nonce.slice(0,16);
             noncebox.value = base32.encode(uint8_tostr(nonce));
             nonceoutbox.value = noncebox.value;
-
-            var plainbytes = str_touint8(base32.decode(plaintext.value));
-            let cipherstruct = sodium.crypto_secretbox_detached(plainbytes, nonce, key);
-
-            ciphertext.value = base32.encode(uint8_tostr(cipherstruct.cipher));
-            macbox.value = base32.encode(uint8_tostr(cipherstruct.mac));
-
-            console.log(plaintext.value.length, plainbytes.length, cipherstruct.cipher.length)
           }
-        })();
+
+          async function checkNonce(nonce_cand) {
+            if (nonce_cand.length != sodium.crypto_secretbox_NONCEBYTES) {
+              return false;
+            }
+            return true;
+          }
+
+          function nonceHandler(e) {
+            nonce_cand = str_touint8(base32.decode(noncebox.value));
+            if (checkNonce(nonce_cand)) {
+              nonce = nonce_cand;
+            }
+          }
+
+          async function passHandler(e) {
+            if (nonce == null && noncebox.value.length == 0) {
+              await genNonce();
+            }
+            if (passphrasebox.value.length > 0) {
+              key = sodium.crypto_pwhash(sodium.crypto_secretbox_KEYBYTES, passphrase.value, salt, sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_DEFAULT);
+            }
+          }
+
+          async function inputHandler(e) {
+
+            if(nonce && key) {
+              noncebox.value = base32.encode(uint8_tostr(nonce));
+              nonceoutbox.value = noncebox.value;
+
+              var plainbytes = str_touint8(base32.decode(plaintext.value));
+              let cipherstruct = sodium.crypto_secretbox_detached(plainbytes, nonce, key);
+
+              ciphertext.value = base32.encode(uint8_tostr(cipherstruct.cipher));
+              macbox.value = base32.encode(uint8_tostr(cipherstruct.mac));
+
+              console.log(plaintext.value.length, plainbytes.length, cipherstruct.cipher.length);
+            } else {
+              errorsdiv.value = "Keystream not ready!"
+              console.log(false);
+            }
+          }
+        })
+        .catch(() => {
+          errorsdiv.value = "Encryption failed to initialize!"
+          console.log("Sodium failed to initialize!")
+        });
       </script>
     </div>
   </body>
