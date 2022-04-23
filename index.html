@@ -380,6 +380,10 @@
           }
           return buf;
         }
+        function typedArraysAreEqual(a, b) {
+          if (a.byteLength !== b.byteLength) return false;
+          return a.every((val, i) => val === b[i]);
+        }
 
         const passphrasebox = document.querySelector("input[id='passphrase']");
         const noncebox = document.querySelector("input[id='nonce']");
@@ -392,6 +396,7 @@
         var key = null;
         var salt = null;
         var nonce = null;
+        var prev_nonce = null;
 
         // function filtercharset()
 
@@ -408,6 +413,7 @@
             salt = nonce.slice(0,16);
             noncebox.value = base32.encode(uint8_tostr(nonce));
             nonceoutbox.value = noncebox.value;
+            prev_nonce = nonce;
           }
 
           async function checkNonce(nonce_cand) {
@@ -417,10 +423,16 @@
             return true;
           }
 
-          function nonceHandler(e) {
+          async function nonceHandler(e) {
             nonce_cand = str_touint8(base32.decode(noncebox.value));
-            if (checkNonce(nonce_cand)) {
+            nonce_chk = await checkNonce(nonce_cand);
+            if (nonce_chk) {
               nonce = nonce_cand;
+              if (prev_nonce && !typedArraysAreEqual(prev_nonce.slice(0,16), nonce.slice(0,16))) {
+                salt = nonce.slice(0,16);
+                key = sodium.crypto_pwhash(sodium.crypto_secretbox_KEYBYTES, passphrase.value, salt, sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_DEFAULT);
+              }
+              prev_nonce = nonce;
             }
           }
 
