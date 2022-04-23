@@ -132,7 +132,7 @@
         <div class="input">
           <input type="text" id="nonce" placeholder="leave blank to generate">
         </div>
-        <div class="errorsdiv"><p id="errors"></p></div>
+        <div class="errorsdiv"><p id="errors" style="color: red;"></p></div>
         <div class="description">Message</div>
         <div class="input">
           <textarea id="plaintext" placeholder="Input"></textarea>
@@ -141,6 +141,7 @@
         <div class="input">
           <input type="text" id="inmac" placeholder="Input"></textarea>
         </div>
+        <div class="verifydiv"></div>
         <!-- handle oninput -->
 
         <h2>Output</h2>
@@ -391,7 +392,9 @@
         const plaintext = document.querySelector("textarea[id='plaintext']");
         const ciphertext = document.querySelector("textarea[id='ciphertext']");
         const macbox = document.querySelector("input[id='mac']");
+        const inmacbox = document.querySelector("input[id='inmac']")
         const errorsdiv = document.querySelector("p[id='errors']");
+        const verifydiv = document.querySelector("div.verifydiv");
 
         var key = null;
         var salt = null;
@@ -407,6 +410,7 @@
           passphrasebox.addEventListener('focusout', passHandler);
           noncebox.addEventListener('input', nonceHandler);
           plaintext.addEventListener('input', inputHandler);
+          inmacbox.addEventListener('input', macHandler);
 
           async function genNonce() {
             nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
@@ -433,6 +437,9 @@
                 key = sodium.crypto_pwhash(sodium.crypto_secretbox_KEYBYTES, passphrase.value, salt, sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_DEFAULT);
               }
               prev_nonce = nonce;
+              errorsdiv.innerHTML = "";
+            } else {
+              errorsdiv.innerHTML = "Preamble is the wrong length!";
             }
           }
 
@@ -458,14 +465,33 @@
               macbox.value = base32.encode(uint8_tostr(cipherstruct.mac));
 
               console.log(plaintext.value.length, plainbytes.length, cipherstruct.cipher.length);
+              errorsdiv.innerHTML = "";
+              verifydiv.innerHTML = "";
             } else {
-              errorsdiv.value = "Keystream not ready!"
-              console.log(false);
+              errorsdiv.innerHTML = "Keystream not ready!"
+            }
+          }
+
+          async function macHandler(e) {
+            if(nonce && key && plaintext.value) {
+
+              var verifycipher = str_touint8(base32.decode(plaintext.value));
+              var inmacbytes = str_touint8(base32.decode(inmacbox.value));
+
+              try {
+                var verifystruct = await sodium.crypto_secretbox_open_detached(verifycipher, inmacbytes, nonce, key);
+                if (verifystruct) {
+                  verifydiv.innerHTML = "<p style=\"color: darkgreen; font-size: large\">Verified!</p>"
+                }
+              } catch(err) {
+                verifydiv.innerHTML = "<p style=\"color: red; font-size: large\">Invalid signature!</p>"
+              }
+
             }
           }
         })
         .catch(() => {
-          errorsdiv.value = "Encryption failed to initialize!"
+          errorsdiv.innerHTML = "Encryption failed to initialize!"
           console.log("Sodium failed to initialize!")
         });
       </script>
