@@ -432,9 +432,11 @@
             nonce_chk = await checkNonce(nonce_cand);
             if (nonce_chk) {
               nonce = nonce_cand;
-              if (prev_nonce && !typedArraysAreEqual(prev_nonce.slice(0,16), nonce.slice(0,16))) {
+              if (!prev_nonce || !typedArraysAreEqual(prev_nonce.slice(0,16), nonce.slice(0,16))) {
                 salt = nonce.slice(0,16);
-                key = sodium.crypto_pwhash(sodium.crypto_secretbox_KEYBYTES, passphrase.value, salt, sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_DEFAULT);
+                if (passphrasebox.value.length > 0) {
+                  key = sodium.crypto_pwhash(sodium.crypto_secretbox_KEYBYTES, passphrase.value, salt, sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_DEFAULT);
+                }
               }
               prev_nonce = nonce;
               errorsdiv.innerHTML = "";
@@ -447,7 +449,7 @@
             if (nonce == null && noncebox.value.length == 0) {
               await genNonce();
             }
-            if (passphrasebox.value.length > 0) {
+            if (passphrasebox.value.length > 0 && salt) {
               key = sodium.crypto_pwhash(sodium.crypto_secretbox_KEYBYTES, passphrase.value, salt, sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE, sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE, sodium.crypto_pwhash_ALG_DEFAULT);
             }
           }
@@ -468,7 +470,7 @@
               errorsdiv.innerHTML = "";
               verifydiv.innerHTML = "";
             } else {
-              errorsdiv.innerHTML = "Keystream not ready!"
+              errorsdiv.innerHTML = "Keystream not ready! Fill in both the passphrase and preamble."
             }
           }
 
