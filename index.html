@@ -137,7 +137,7 @@
         <div class="input">
           <textarea id="plaintext" placeholder="Input"></textarea>
         </div>
-        <div class="description">Signature (optional for verification)</div>
+        <div class="description">Tamper-proof Seal Code (optional for verification)</div>
         <div class="input">
           <input type="text" id="inmac" placeholder="Input"></textarea>
         </div>
@@ -153,7 +153,7 @@
         <div class="output">
           <textarea id="ciphertext" placeholder="Output" readonly></textarea>
         </div>
-        <div class="description">Signature</div>
+        <div class="description">Tamper-proof Seal Code</div>
         <div class="output">
           <input type="text" id="mac" placeholder="Output" readonly></textarea>
         </div>
@@ -401,9 +401,12 @@
         var nonce = null;
         var prev_nonce = null;
 
-        // function filtercharset()
-
-        // function modulo8pad()
+        function modulo8pad(in_string) {
+          if (in_string.length % 8 == 0) {
+            return in_string;
+          }
+          return in_string + ' '.repeat(8 - (in_string.length % 8));
+        }
 
         sodium.ready
         .then(() => {
@@ -456,17 +459,20 @@
 
           async function inputHandler(e) {
 
+            plaintext.value = plaintext.value.toLowerCase().replace(/[^ !',.abcdefghijklmnopqrstuvwxyz?]/gi, '');
+
             if(nonce && key) {
               noncebox.value = base32.encode(uint8_tostr(nonce));
               nonceoutbox.value = noncebox.value;
 
-              var plainbytes = str_touint8(base32.decode(plaintext.value));
+              plaintext_padded = modulo8pad(plaintext.value);
+
+              var plainbytes = str_touint8(base32.decode(plaintext_padded));
               let cipherstruct = sodium.crypto_secretbox_detached(plainbytes, nonce, key);
 
               ciphertext.value = base32.encode(uint8_tostr(cipherstruct.cipher));
               macbox.value = base32.encode(uint8_tostr(cipherstruct.mac));
 
-              console.log(plaintext.value.length, plainbytes.length, cipherstruct.cipher.length);
               errorsdiv.innerHTML = "";
               verifydiv.innerHTML = "";
             } else {
